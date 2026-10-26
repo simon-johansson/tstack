@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Merge the latest t3dotgg/tstack into this fork, push it, and reinstall the
+# skills with agents-setup's ./sync.
+#
+#   ./pull-upstream
+#
+# agents-setup/local-skills is a symlink to this repo's skills/, so ./sync
+# installs whatever is checked out here. A merge conflict stops the script:
+# resolve it, commit, and run the script again.
+set -euo pipefail
+
+cd "$(dirname "$0")"
+
+if [[ "$(git branch --show-current)" != main ]]; then
+  echo "pull-upstream: check out main first" >&2
+  exit 1
+fi
+if [[ -n "$(git status --porcelain)" ]]; then
+  echo "pull-upstream: commit or discard your changes first" >&2
+  exit 1
+fi
+
+git fetch upstream
+git merge --no-edit upstream/main
+git push origin main
+
+# ./sync records where the agents-setup checkout lives.
+agents_setup="$(cat "$HOME/.claude/skills/.encore-agents-setup-repo")"
+"$agents_setup/sync"
