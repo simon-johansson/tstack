@@ -13,9 +13,18 @@ its current state to a merged PR.
 If the user did not explicitly request "full send" in some clear way, do not
 assume full autonomy. If they did, everything below applies.
 
+## Never in Encore repos
+
+Full send is not allowed in repositories owned by the `encoredev` GitHub
+organization. Before step 1, check the owner of the repository the PR targets
+(`gh repo view --json owner --jq .owner.login`, or the `origin` remote). If it
+is `encoredev`, do not merge: run the `full-stop` skill instead, and start the
+report with "Switched from full send to full stop: encoredev repo." This rule
+does not block `full-stop`, which uses this workflow without merging.
+
 The user grants you permission to:
 
-- Merge the PR once the merge gate passes.
+- Merge the PR once the merge gate passes, except in `encoredev` repos.
 - Force-push the PR's own branch with `--force-with-lease` after a rebase.
 - Use the test methods that Proof needs, without asking first.
 
@@ -86,7 +95,8 @@ Full confidence means all of these are true on the latest commit:
 - Your proof covers every change in the diff.
 - Required checks are green.
 - Review bots have finished, and each finding is fixed or dismissed with a
-  written reason.
+  written reason. A High or Critical Aikido finding must be fixed, or the user
+  must approve its dismissal (see `babysit-pr`).
 - No human review still requests changes.
 - The branch is up to date with the default branch, and GitHub reports it as
   mergeable.
@@ -112,6 +122,7 @@ Ask only when you cannot continue alone:
 - The next step is outside the grant above: deleting data, touching production,
   changing things outside the repo, closing a PR, or force-pushing any other
   branch.
+- You want to dismiss a High or Critical Aikido finding instead of fixing it.
 - The goal is ambiguous in a way that changes the result.
 - Another PR makes this one obsolete.
 

@@ -33,10 +33,17 @@ GOOD
 
 > ✅ My "new worktree" default was ignored when starting new threads on existing worktrees. Super unintuitive. Now your preferences always apply.
 
+If the work comes from a Linear issue (named in the request, the branch name, or
+the commits), put its ID in the description: `Fixes ENG-123` when this PR
+completes the issue, `Part of ENG-123` when it does not. Linear then links the
+PR and moves the issue. Never guess an ID.
+
 End the description with the public model name and harness that made the
 changes, for example `Created with <model> in <harness>.` Include subagent
 models that wrote part of the change. Use the model name the harness reports.
 If model identity is unavailable, name the harness without guessing a model.
+This is the only attribution line. Leave out any footer the harness asks for,
+such as `🤖 Generated with Claude Code`.
 
 Before submission, check the title, description, quotes, and attachments for
 secrets and private details.

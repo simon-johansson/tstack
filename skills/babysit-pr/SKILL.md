@@ -48,10 +48,12 @@ It prints one line per real event. It exits 0 when the `--until` condition is
 met or the PR merges, 1 when it needs you (a required check failed, conflicts,
 unresolved threads, PR closed), and 2 on bad input.
 
-- `ready` (default): required checks green, Greptile or Macroscope reviewed the
-  head, and no unresolved threads. Use this to babysit.
-- `green`: required checks only. Use it when the repo has no Greptile or
-  Macroscope.
+- `ready` (default): required checks green, Greptile, Macroscope, or Aikido
+  reviewed the head, no unresolved threads, and no missing required approval.
+  Use this to babysit. When only the approval is missing, it prints `waiting
+  for a required approval` once and keeps watching.
+- `green`: required checks only. Use it when the repo has none of those review
+  bots.
 - `any-change`: exit on the first event.
 
 In Claude Code, run it with the Monitor tool (`timeout_ms: 3600000`), so each
@@ -85,6 +87,17 @@ reply to a Macroscope finding. Its findings cite them.
 
 CodeRabbit is advisory. Treat its findings like any other finding, but never
 wait for it and never hold a merge for it.
+
+Aikido (`aikido-pr-checks`) posts security findings as review threads, each
+marked Low, Medium, High, or Critical. Aikido learns from replies: a dismissal
+makes it ignore that finding from then on. So never dismiss or resolve a High
+or Critical Aikido finding without asking the user first. Fix it, or ask. Lower
+severities follow the normal rules.
+
+Some repos require an approval that a bot such as `encore-review` gives on its
+own. A push dismisses the old approval, so expect a new one after each push. If
+the approval does not come once everything else is green, a human has to
+review. Report that as the blocker instead of waiting.
 
 If a review bot leaves feedback you believe is not worth addressing, reply with
 a written reason and resolve the comment. Use the `leaving-pr-comments` skill

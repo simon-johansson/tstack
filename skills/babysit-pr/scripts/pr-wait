@@ -11,15 +11,17 @@ Progress and errors that do not end the run go to stderr.
 --until
   green       required checks passed on the current head (every CI check when
               the base branch requires none)
-  ready      green, Greptile or Macroscope reviewed the current head, and no
-              review thread is unresolved (default)
+  ready       green, Greptile, Macroscope, or Aikido reviewed the current head,
+              no review thread is unresolved, and no required approval is
+              missing (default)
   any-change  stop after the first poll that prints an event
 
 Exit codes
   0  the --until condition is met, or the PR merged
   1  the condition cannot be met without action: a required check failed, the
      branch conflicts with its base, the PR closed, `ready` is blocked by
-     unresolved threads or a BEHIND branch, or GitHub stayed unreachable
+     unresolved threads, a BEHIND branch, or a review that requests changes,
+     or GitHub stayed unreachable
   2  bad arguments, unknown PR, or another pr-wait already watches this PR
 
 Events
@@ -27,15 +29,18 @@ Events
   - all checks finished on the head (one summary line)
   - a new comment, review, thread, or thread reply from someone other than the
     PR author or the gh user
-  - Greptile, Macroscope, or CodeRabbit finished on the head, or a Greptile or
-    Macroscope summary changed after that
+  - Greptile, Macroscope, Aikido, or CodeRabbit finished on the head, or a
+    Greptile or Macroscope summary changed after that
+  - `ready` is met except for a required approval (printed once per watcher,
+    then it keeps watching for the approval)
   - the base branch moved and the new commits touch files in this PR
   - merge state became BEHIND or DIRTY
   - the PR merged or closed
 
 CodeRabbit is advisory: pr-wait reports it but never waits for it. Comment
-edits are never events, and top-level comments from CI and deploy bots
-(github-actions, Vercel) are skipped, because checks already carry that news.
+edits are never events, and top-level comments from CI, deploy, and tracker
+bots (github-actions, Vercel, Linear) are skipped, because they are status
+reports.
 
 State lives in ~/.local/state/pr-wait/. A lock makes a second watcher for the
 same PR exit at once. A state file lets a restarted watcher report what arrived
@@ -59,10 +64,10 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, NoReturn
 
-GATING_BOTS = ("greptile", "macroscope")
+GATING_BOTS = ("greptile", "macroscope", "aikido")
 ADVISORY_BOTS = ("coderabbit",)
 # CI and deploy bots report through checks. Their PR comments are status reports.
-STATUS_BOTS = ("github-actions", "vercel", "netlify", "railway", "cloudflare")
+STATUS_BOTS = ("github-actions", "vercel", "netlify", "railway", "cloudflare", "linear")
 STATE_DIR = Path.home() / ".local" / "state" / "pr-wait"
 # A state file older than this describes an old session. Start a fresh baseline
 # instead of replaying hours of comments as new events.
@@ -83,7 +88,7 @@ query($owner: String!, $name: String!, $number: Int!) {
   viewer { login }
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
-      url state headRefOid baseRefName mergeStateStatus
+      url state headRefOid baseRefName mergeStateStatus reviewDecision
       author { login }
       baseRef { target { oid } }
       comments(last: 100) { nodes { id url body author { login __typename } } }
@@ -466,6 +471,8 @@ class Watcher:
         if base_oid:
             self.state["base_oid"] = base_oid
         merge_state = pr["mergeStateStatus"]
+        # APPROVED, REVIEW_REQUIRED, CHANGES_REQUESTED, or None.
+        decision = pr.get("reviewDecision")
         dirty_line = f"merge state is DIRTY: the branch conflicts with {base}, rebase it"
         behind_line = f"merge state is BEHIND: update the branch from {base} before merging"
         if merge_state != "UNKNOWN":
@@ -486,8 +493,10 @@ class Watcher:
             if self.required
             else "",
             ", ".join(bot_status[b] for b in GATING_BOTS + ADVISORY_BOTS if b in bot_status)
-            or "no Greptile or Macroscope yet",
+            or "no review bot yet",
             f"{len(unresolved)} unresolved threads",
+            {"APPROVED": "review approved", "REVIEW_REQUIRED": "approval required",
+             "CHANGES_REQUESTED": "changes requested"}.get(decision or "", ""),
             f"merge state {merge_state}",
         ]
         summary = "; ".join(p for p in parts if p)
@@ -503,14 +512,22 @@ class Watcher:
             if green and self.until == "green":
                 self.reported.add(checks_key)
                 self.finish(0, [f"green on {short}: {summary}{self.behind(base, base_oid, head)}"])
-            # ready waits for Greptile or Macroscope, never for CodeRabbit.
+            # ready waits for Greptile, Macroscope, or Aikido, never for CodeRabbit.
             if green and reviewed:
                 if unresolved:
                     self.finish(1, [f"blocked by {len(unresolved)} unresolved threads on {short}: {' '.join(unresolved)}"])
                 if merge_state == "BEHIND":
                     self.finish(1, [behind_line])
-                self.reported.add(checks_key)
-                self.finish(0, [f"ready on {short}: {summary}{self.behind(base, base_oid, head)}"])
+                if decision == "CHANGES_REQUESTED":
+                    self.finish(1, [f"a review requests changes on {short}: {summary}"])
+                # Rulesets can leave reviewDecision empty while a review is still
+                # required. GitHub then reports the merge state as BLOCKED.
+                if decision == "REVIEW_REQUIRED" or (decision is None and merge_state == "BLOCKED"):
+                    # An approval bot may still be on its way, so keep watching.
+                    self.say(f"waiting for a required approval on {short}: {summary}")
+                else:
+                    self.reported.add(checks_key)
+                    self.finish(0, [f"ready on {short}: {summary}{self.behind(base, base_oid, head)}"])
         if all_done and (stable or self.baseline):
             self.emit(checks_key, f"checks finished on {short}: {summary}")
         if self.until == "any-change" and self.events:
