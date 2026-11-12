@@ -77,10 +77,16 @@ used up, the REST limit is separate and usually still has room. Use
 
 ## Reviews
 
-Only act on checks and comments newer than the latest push. Verify every bot
-finding against the source before changing code. Fix real findings and CI
-failures, distinguish repository failures from infrastructure flakes, and reply
-with a written reason when dismissing false positives.
+Only act on checks and comments newer than the latest push. Read a bot's whole
+thread, not just its first comment. A later reply such as Aikido's "Partially
+fixed … this issue remains because …" is the finding's current state. Verify
+every bot finding against the source before changing code. Fix the cause, not
+just the line the bot points at, and check the PR for the same mistake
+elsewhere. Reply with a written reason when dismissing false positives.
+
+Reply to a fixed finding after you push, so the commit exists on the remote.
+Name the commit, say what changed, and name the test that covers it if there
+is one.
 
 If the repo has `.macroscope/check-run-agents/*.md`, read those rules before you
 reply to a Macroscope finding. Its findings cite them.
@@ -92,7 +98,10 @@ Aikido (`aikido-pr-checks`) posts security findings as review threads, each
 marked Low, Medium, High, or Critical. Aikido learns from replies: a dismissal
 makes it ignore that finding from then on. So never dismiss or resolve a High
 or Critical Aikido finding without asking the user first. Fix it, or ask. Lower
-severities follow the normal rules.
+severities follow the normal rules. Aikido re-reviews each push and resolves
+the threads it agrees are fixed. Before you resolve a handled Aikido thread
+yourself, wait for its review of the latest head, and never resolve one it
+pushed back on.
 
 Some repos require an approval that a bot such as `encore-review` gives on its
 own. A push dismisses the old approval, so expect a new one after each push. If
@@ -111,6 +120,31 @@ Decline the rest with a written reason, and list them as follow-ups:
 unneeded tests, guards for edge cases that do not matter, extra integration
 or compatibility, and small performance costs. Prefer the fix that deletes or
 narrows code.
+
+## Failing checks
+
+Read the failure first: `gh run view <run-id> --log-failed` for GitHub
+Actions. If the PR caused it, reproduce it locally where you can, fix it, and
+confirm the fix. Call it a flake only if the PR does not touch the failing
+code, and it passes locally or also fails on the base branch. Do not change
+code for a flake. Re-run only the failed jobs: `gh run rerun <run-id>
+--failed`.
+
+## Loop limits
+
+Review loops can run forever. Cap them, and keep going on your own:
+
+- A check that fails the same way after two re-runs is not a flake.
+  Investigate it as a real failure. If it also fails on the base branch,
+  report that evidence instead of changing code for it.
+- When a finding comes back a third time after you fixed or answered it,
+  take a final position. Either fix the cause properly, or reply once more
+  with the reason and resolve the thread. If it comes back after that, stop
+  working on it and report it as a blocker.
+
+Ask the user only for decisions that are theirs: an API change, a real
+trade-off, or a High or Critical Aikido dismissal. List anything you capped
+in your report.
 
 ## Base branch and merging
 
