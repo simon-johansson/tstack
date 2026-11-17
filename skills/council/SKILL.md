@@ -10,12 +10,13 @@ relevant checks. Give council the updated implementation; do not defer known
 fixes until reviews return. If the user wants to discard the implementation
 and explore new ideas, skip fixes to code being replaced.
 
-Bring in three delegates to help with the user's request, usually for review
-or feedback. Use three different strong models at high reasoning effort. If the
-user's instructions name council members, use those. Otherwise pick the latest
-flagship models, spread over as many providers as you can reach, for example
-Claude Opus, GPT Sol, and Gemini Pro. With two providers, take two different
-models from one of them. Never seat the same model twice.
+Bring in delegates to help with the user's request, usually for review or
+feedback. If the user's instructions name council members, seat exactly those,
+even if that is fewer than three. Otherwise seat three different strong models
+at high reasoning effort: the latest flagship models, spread over as many
+providers as you can reach, for example Claude Opus, GPT Sol, and Gemini Pro.
+With two providers, take two different models from one of them. Never seat the
+same model twice.
 
 In T3 Code, use `orchestrator_capabilities` to resolve the models, then
 `delegate_task` to start one delegate per model in parallel. Elsewhere, use
